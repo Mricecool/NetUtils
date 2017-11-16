@@ -1,0 +1,60 @@
+RxJava就是在观察者模式的骨架下，通过丰富的操作符和便捷的异步操作来完成对于复杂业务的处理
+
+
+开关（被观察者）作为事件的产生方（生产“开”和“关”这两个事件），是主动的，是整个开灯事理流程的起点。
+台灯（观察者）作为事件的处理方（处理“灯亮”和“灯灭”这两个事件），是被动的，是整个开灯事件流程的终点。
+在起点和终点之间，即事件传递的过程中是可以被加工，过滤，转换，合并等等方式处理的（上图没有体现，后面对会讲到）。
+
+
+Tips: Observer是观察者的接口， Subscriber是实现这个接口的抽象类,因此两个类都可以被当做观察者，
+由于Subscriber在Observe的基础上做了一些拓展，加入了新的方法，一般会更加倾向于使用Subscriber。
+
+
+
+RxJava的骨架，总结一下：
+
+1创建被观察者，产生事件
+2设置事件传递过程中的过滤，合并，变换等加工操作。
+3订阅一个观察者对象，实现事件最终的处理。
+
+FlatMap的解释是：将每个Observable产生的事件里的信息再包装成新的Observable传递出来，
+
+就是因为FlatMap可以再次包装新的Observable,而每个Observable都可以使用from(T[])方法来创建自己，
+这个方法接受一个列表，然后将列表中的数据包装成一系列事件。
+
+线程调度
+
+//new Observable.just()执行在新线程
+Observable.just(getFilePath())
+          //指定在新线程中创建被观察者
+          .subscribeOn(Schedulers.newThread())
+          //将接下来执行的线程环境指定为io线程
+          .observeOn(Schedulers.io())
+          //map就处在io线程
+          .map(mMapOperater)
+          //将后面执行的线程环境切换为主线程，
+          //但是这一句依然执行在io线程
+          .observeOn(AndroidSchedulers.mainThread())
+          //指定线程无效，但这句代码本身执行在主线程
+          .subscribeOn(Schedulers.io())
+          //执行在主线程
+          .subscribe(mSubscriber);
+          
+实际上线程调度只有subscribeOn（）和observeOn（）两个方法。
+1.subscribeOn（）它指示Observable在一个指定的调度器上创建（只作用于被观察者创建阶段）。
+只能指定一次，如果指定多次则以第一次为准
+2.observeOn（）指定在事件传递（加工变换）和最终被处理（观察者）的发生在哪一个调度器。
+可指定多次，每次指定完都在下一步生效。
+
+
+1.onSubscribe是Observable内部唯一属性，是连接Observable和subscriber的关键，相当于连接台灯和开关的那根电线
+2.call(Subscriber<? super String> subscriber)中的subscriber，就是我们自己创建的那个观察者
+3.只有在订阅的时候，才会发生onSubscribe.call(subscriber)，进而才会开始调用onNext(),onComplete()等。
+
+1.订阅这个动作，实际上是观察者(subscriber)对象把自己传递给被观察者(observable)内部的onSubscribe。
+2.onSubscribe的工作就是调用call(subscriber)来通知被观察者发送消息给这个subscriber。
+
+
+
+背压是指在异步场景中，被观察者发送事件速度远快于观察者的处理速度的情况下，一种告诉上游的被观察者降低发送速度的策略
+简而言之，背压是流速控制的一种策略。
